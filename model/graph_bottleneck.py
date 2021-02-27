@@ -4,39 +4,33 @@
 # DNAConv on top layer for dynamics prediction
 #
 # Code copied from pytorch example: 
-# github.com/rusty1s/pytorch_geometric/blob/master/benchmark/kernel/asap.py 
+# github.com/rusty1s/pytorch_geometric/
 
-import torch.nn
-from torch_geometric.nn import ASAPooling, GraphConv, DNAConv
+from torch.nn              import Module, ModuleList
+from torch.nn.functional   import relu
+from torch_geometric.nn    import GraphConv, EdgePooling
+from torch_geometric.nn    import global_mean_pool as gap, global_max_pool as gmp
+from torch_geometric.utils import to_dense_batch
+from torch_geometric.data  import Data
 
-class ObjGraph(torch.nn.Module):
-    def __init__(self, num_features_in,num_layers,hidden,ratio=0.8,dropout=0):
-        super(GNN, self).__init__()
-        self.conv1 = GraphConv(num_features_in, hidden, aggr='mean')
-        self.convs = torch.nn.ModuleList()
-        self.pools = torch.nn.ModuleList()
-        self.convs.extend([
-            GraphConv(hidden, hidden, aggr='mean')
-            for i in range(num_layers - 1)
-            ])
-        self.pools.extend([
-            ASAPooling(hidden, ratio, dropout=dropout)
-            for i in range((num_layers) // 2)
-            ])
+class ObjGraph(Module):
+  
+    def __init__(self, hidden_dim, num_layers):
+        super(ObjGraph, self).__init__()
+        
+        self.convs = ModuleList([GraphConv(hidden_dim,hidden_dim,aggr="max") for _ in range(num_layers)])
+        self.pools = ModuleList([EdgePooling(hidden_dim) for _ in range(num_layers)])
+
+        # Dynamics module (predicts a vector with global attention and then graph conv conditioned on it)
+        # ...
+
+    # Returns a graph vec for the input graph and also the prediction of the graph's next state ...
     def forward(self, data):
+        
         x, edge_index, batch = data.x, data.edge_index, data.batch
-        edge_weight = None
-        x = F.relu(self.conv1(x, edge_index))
-        for i, conv in enumerate(self.convs):
-            x = conv(x=x, edge_index=edge_index, edge_weight=edge_weight)
-            x = F.relu(x)
-            if i % 2 == 0 and i < len(self.convs) - 1:
-                pool = self.pools[i // 2]
-                x, edge_index, edge_weight, batch, _ = pool(
-                        x=x, edge_index=edge_index, edge_weight=edge_weight,
-                        batch=batch)
-        x = self.jump(xs)
-        x = F.relu(self.lin1(x))
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.lin2(x)
-        return F.log_softmax(x, dim=-1)
+
+        for conv, pool in zip(self.convs,self.pools):
+            x = relu(conv(x, edge_index))
+            x, edge_index, batch, _ = pool(x, edge_index, batch=batch)
+            
+        return to_dense_batch(x,batch)[0] # put back into BxNxF

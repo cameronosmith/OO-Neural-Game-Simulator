@@ -33,7 +33,7 @@ class model(nn.Module):
 
     # Creates the sum-modules
     # For now just hard-code hyperparameters but later use config
-    def __init__(self, device="cpu"):
+    def __init__(self):
 
         super(model, self).__init__()
 
@@ -42,10 +42,12 @@ class model(nn.Module):
             num_features=16,growth_rate=16, num_blocks=8, num_layers=5)
 
         # Graph network with hierarchical pooling
-        #self.graph_encoder = graph_bottleneck()
+        self.graph_encoder = graph_bottleneck.ObjGraph()
 
-        # Image reconstruction spatial broadcast decoder
-        # Graph network for dynamics prediction
+        # Image reconstruction via hypernetwork
+         
+        
+        # Graph network for dynamics prediction ...
 
     # Forward pass through model
     # img_pairs : two consecutive frames
