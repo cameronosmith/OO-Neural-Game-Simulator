@@ -14,20 +14,21 @@ from model.vsitzmann_submodules import vsitzmann_pytorch_prototyping as pytorch_
 class HyperNetImgGen(nn.Module):
     # 
     # imsize : image dimension
-    def __init__(self, imsize, latent_dim, hyper_hidden_dim):
+    def __init__(self, imsize, latent_dim, hyper_hidden_dim, batch_size):
         
         super().__init__()
         
         self.latent_dim = latent_dim
-        self.num_hidden_units_phi = 64
+        self.num_hidden_units_phi = 16
         self.phi_layers = 3  # includes the in and out layers
         self.rendering_layers = 3  # includes the in and out layers
         
-        #batchsize=4 dont hardcode
-                
         # Image coordinates to use in image generation
-        points_xy = torch.cat([x.unsqueeze(0) for x in  torch.meshgrid([torch.linspace(-1, 1, imsize) for _ in range(2)])])
-        self.batch_coords_xy = points_xy.unsqueeze(0).repeat(4,*[1]*len(points_xy.shape)).reshape(4,-1,2).cuda()
+        points_xy = torch.cat([x.unsqueeze(0) 
+                                   for x in torch.meshgrid([torch.linspace(-1, 1, imsize) 
+                                        for _ in range(2)])])
+        self.batch_coords_xy = points_xy.unsqueeze(0).repeat(batch_size,
+                                   *[1]*len(points_xy.shape)).reshape(batch_size,-1,2).cuda()
         
         self.hyper_phi = hyperlayers.HyperFC(hyper_in_ch=latent_dim,
                                              hyper_num_hidden_layers=1,
@@ -44,14 +45,14 @@ class HyperNetImgGen(nn.Module):
                                                            outermost_linear=True)
 
 
-    # z      : latent vector to condition network on
+    # z      : ...
     # return : generated img
     def forward(self, z):
 
         phi = self.hyper_phi(z) # Forward pass through hypernetwork yields a (callable) SRN.
 
         # Map img coordinates to feature vecs then to RGB vecs 
-        v = phi(self.batch_coords_xy)
+        v = phi(self.batch_coords_xy).max(dim=1)[0] # max over feature vectors from all objects
         img_out = self.pixel_generator(v)
 
         return img_out

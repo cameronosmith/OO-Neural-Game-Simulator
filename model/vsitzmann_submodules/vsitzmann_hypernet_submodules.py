@@ -187,7 +187,10 @@ class BatchLinear(nn.Module):
         return "BatchLinear(in_ch=%d, out_ch=%d)"%(self.weights.shape[-1], self.weights.shape[-2])
 
     def forward(self, input):
-        output = input.matmul(self.weights.permute(*[i for i in range(len(self.weights.shape)-2)], -1, -2))
+        try:
+            output = input.matmul(self.weights.permute(*[i for i in range(len(self.weights.shape)-2)], -1, -2))
+        except:
+            import pdb;pdb.set_trace()
         output += self.biases
         return output
 
@@ -220,8 +223,6 @@ class HyperLinear(nn.Module):
 
     def forward(self, hyper_input):
         hypo_params = self.hypo_params(hyper_input.cuda())
-        # Modification here - each node predicts network and we take max to get final network 
-        hypo_params = hypo_params.max(1)[0]
 
         # Indices explicit to catch erros in shape of output layer
         weights = hypo_params[..., :self.in_ch * self.out_ch]
@@ -229,5 +230,6 @@ class HyperLinear(nn.Module):
 
         biases = biases.view(*(biases.size()[:-1]), 1, self.out_ch)
         weights = weights.view(*(weights.size()[:-1]), self.out_ch, self.in_ch)
+        print(hyper_input.shape,weights.shape)
 
         return BatchLinear(weights=weights, biases=biases)
